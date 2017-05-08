@@ -1,11 +1,13 @@
-# a`server.py
+# aserver.py
 # fib microsrvice
 
 from fib import fib
 from socket import *
 from collections import deque
 from select import select
+from concurrent.futures import ThreadPoolExecutor as Pool
 
+pool = Pool(10)
 tasks = deque()
 recv_wait = {}     # Mapping sockets -> tasks (generators)
 send_wait = {}
@@ -52,7 +54,8 @@ def fib_handler(client):
         if not req:
             break
         n = int(req)
-        result = fib(n)
+        future = pool.submit(fib, n)
+        result = future.result()    # Actually block the operation
         resp = str(result).encode('ascii') + b'\n'
         yield 'send', client
         client.send(resp)
