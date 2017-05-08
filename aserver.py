@@ -31,7 +31,7 @@ def run():
         while not tasks:
             # No active tasks to run
             # wait for I/O
-            can_recv, can_send, [] = select(recv_wait, send_wait, [])
+            can_recv, can_send, _ = select(recv_wait, send_wait, [])
             for s in can_recv:
                 tasks.append(recv_wait.pop(s))
             for s in can_send:
@@ -52,22 +52,39 @@ def run():
         except StopIteration:
             print("Task done!")
 
+class AsyncSocket(object):
+    def __init__(self, sock):
+        self.sock = sock
+    
+    def recv(self, maxsize):
+        yield 'recv', self.sock
+        return self.sock.recv(maxsize)
+    
+    def send(self, data):
+        yield 'send', self.sock
+        return self.sock.send(data)
+    
+    def accept(self):
+        yield 'recv', self.sock
+        client, addr = self.sock.accept()
+        return AsyncSocket(client), addr
+    
+    def __getattr__(self, name):
+        return getattr(self.sock, name)
+
 def fib_server(address):
-    sock = socket(AF_INET, SOCK_STREAM)
+    sock = AsyncSocket(socket(AF_INET, SOCK_STREAM))
     sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     sock.bind(address)
     sock.listen(5)
     while True:
-        yield 'recv', sock
-        client, addr = sock.accept()
+        client, addr = yield from sock.accept()
         print("Connection", addr)
         tasks.append(fib_handler(client))
 
-
 def fib_handler(client):
     while True:
-        yield 'recv', client
-        req = client.recv(100)  # blocking
+        req = yield from client.recv(100)  # blocking
         if not req:
             break
         n = int(req)
@@ -75,8 +92,7 @@ def fib_handler(client):
         yield 'future', future
         result = future.result()    # Actually block the operation
         resp = str(result).encode('ascii') + b'\n'
-        yield 'send', client
-        client.send(resp)
+        yield from client.send(resp)
     print("Closed")
 
 tasks.append(fib_server(('', 25000)))
