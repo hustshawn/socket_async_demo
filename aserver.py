@@ -5,9 +5,9 @@ from fib import fib
 from socket import *
 from collections import deque
 from select import select
-from concurrent.futures import ThreadPoolExecutor as Pool
+from concurrent.futures import ProcessPoolExecutor as Pool
 
-pool = Pool(10)
+pool = Pool(4)
 tasks = deque()
 recv_wait = {}     # Mapping sockets -> tasks (generators)
 send_wait = {}
